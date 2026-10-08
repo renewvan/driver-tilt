@@ -1,0 +1,15 @@
+; node-tilt — local configuration
+; ======================================
+; Copy this file to config.ini and override only what differs from
+; config.default.ini. config.ini is gitignored — it holds this
+; installation's real MQTT broker host and any hardware-specific settings.
+
+[mqtt]
+host = 192.168.1.10
+
+[node]
+; Board mounted face-down, X toward the front of the van. Adjust to your
+; mounting; see README "Mounting orientation".
+axis_x = +x
+axis_y = -y
+axis_z = -z

@@ -1,0 +1,23 @@
+[project]
+name = "node-tilt"
+version = "0.1.0"
+description = "Van inclination (roll/pitch) node: reads a GY-521 / MPU-6050 IMU over I2C and publishes level to the renewvan MQTT bus"
+requires-python = ">=3.11"
+dependencies = [
+    "paho-mqtt>=1.6,<2",
+    "smbus2>=0.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["node_tilt*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W"]
