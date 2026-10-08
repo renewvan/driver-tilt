@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from node_tilt.config import load_config
+from node_tilt.config import DEFAULT_STATE_DIR, load_config
 
 
 def test_load_config_defaults() -> None:
@@ -47,3 +47,10 @@ def test_invalid_node_config_fails_at_load(tmp_path: Path, override: str) -> Non
     local.write_text(f"[node]\n{override}\n")
     with pytest.raises(ValueError):
         load_config(local_path=local)
+
+
+def test_state_dir_defaults_to_package_state_and_is_overridable(tmp_path: Path) -> None:
+    assert load_config().node.state_dir == DEFAULT_STATE_DIR
+    local = tmp_path / "config.ini"
+    local.write_text("[node]\nstate_dir = /data/tilt\n")
+    assert load_config(local_path=local).node.state_dir == Path("/data/tilt")

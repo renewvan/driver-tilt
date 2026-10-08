@@ -194,3 +194,69 @@ def test_should_publish_boundary_is_inclusive() -> None:
     assert not should_publish_angles(0.49, 0.0, state, node, 1.0)
     assert should_publish_angles(0.5, 0.0, state, node, 1.0)
     assert should_publish_angles(0.0, -0.5, state, node, 1.0)
+
+
+def test_run_persists_and_restores_level_zero_via_the_configured_state_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # run() once ignored node.state_dir and always used the package-relative
+    # default, so in a container the install zero vanished on every recreate.
+    # Drive run() itself: set a zero through the subscribed command, "restart",
+    # and require the new run() to load it back from the configured dir.
+    from node_tilt import driver
+
+    config = load_config()
+    node = replace(config.node, smoothing_alpha=1.0, state_dir=tmp_path / "mounted")
+    config = replace(config, node=node)
+
+    # BaseException: run() swallows `Exception` around each read (it must keep
+    # publishing through a bad cycle), which would turn a stop signal into an
+    # infinite loop.
+    class StopLoop(BaseException):
+        pass
+
+    def one_run(samples, command: str | None) -> TiltState:
+        captured: dict = {}
+
+        class RunPublisher(FakePublisher):
+            def __init__(self, _config) -> None:
+                super().__init__()
+
+            def connect(self) -> None: ...
+            def disconnect(self) -> None: ...
+
+            def subscribe(self, topic: str, callback) -> None:
+                captured["command"] = callback
+
+        class RunImu(FakeImu):
+            def __init__(self, **_kw) -> None:
+                super().__init__(samples)
+
+            def close(self) -> None: ...
+
+        def fake_read_and_publish(pub, imu, node_, state, axis_map, now) -> None:
+            captured["state"] = state
+            read_and_publish(pub, imu, node_, state, axis_map, now)
+            if command is not None:
+                captured["command"](command)
+            raise StopLoop
+
+        monkeypatch.setattr(driver, "Publisher", RunPublisher)
+        monkeypatch.setattr(driver, "MPU6050", RunImu)
+        monkeypatch.setattr(driver, "read_and_publish", fake_read_and_publish)
+        monkeypatch.setattr(driver.time, "sleep", lambda _s: None)
+        with pytest.raises(StopLoop):
+            driver.run(config)
+        return captured["state"]
+
+    default_file = driver.DEFAULT_STATE_DIR / f"{node.id}.json"
+    assert not default_file.exists(), "test would be meaningless with a pre-existing zero"
+
+    first = one_run([tilted(3.0, -1.0)], command="now")
+    assert (first.roll_offset, first.pitch_offset) == pytest.approx((3.0, -1.0), abs=0.01)
+    # The zero must land in the configured directory, never the package default.
+    assert (node.state_dir / f"{node.id}.json").exists()
+    assert not default_file.exists()
+
+    second = one_run([tilted(3.0, -1.0)], command=None)
+    assert (second.roll_offset, second.pitch_offset) == pytest.approx((3.0, -1.0), abs=0.01)

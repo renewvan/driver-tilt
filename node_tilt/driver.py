@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from node_tilt.config import AppConfig, NodeConfig
+from node_tilt.config import DEFAULT_STATE_DIR, AppConfig, NodeConfig
 from node_tilt.imu import MPU6050
 from node_tilt.publisher import Publisher
 from node_tilt.tilt_math import (
@@ -34,8 +34,9 @@ from node_tilt.tilt_math import (
 
 logger = logging.getLogger(__name__)
 
-# State directory for machine-written persistence (same convention as node-tank).
-_STATE_DIR = Path(__file__).resolve().parent.parent / "state"
+# Default state directory for machine-written persistence (same convention as
+# node-tank); `state_dir` in config.ini overrides it per install.
+_STATE_DIR = DEFAULT_STATE_DIR
 
 
 @dataclass
@@ -206,14 +207,14 @@ def run(config: AppConfig) -> None:
     node = config.node
     axis_map = AxisMap(node.axis_x, node.axis_y, node.axis_z)
     state = TiltState()
-    state.roll_offset, state.pitch_offset = load_offsets(node.id)
+    state.roll_offset, state.pitch_offset = load_offsets(node.id, node.state_dir)
 
     publisher = Publisher(config.mqtt)
     publisher.connect()
     imu = MPU6050(bus_number=node.i2c_bus, address=node.i2c_address)
     publisher.subscribe(
         _topic(node.id, "level_zero/set"),
-        lambda payload: handle_level_zero_command(publisher, node, state, payload),
+        lambda payload: handle_level_zero_command(publisher, node, state, payload, node.state_dir),
     )
 
     try:

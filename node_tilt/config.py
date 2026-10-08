@@ -19,6 +19,7 @@ from node_tilt.tilt_math import AxisMap
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config.default.ini"
+DEFAULT_STATE_DIR = Path(__file__).resolve().parent.parent / "state"
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,10 @@ class NodeConfig:
     heartbeat_s: float
     # Consecutive failed reads before status flips to sensor_error.
     error_threshold: int
+    # Where the level-zero offsets persist (<state_dir>/<id>.json). Must be a
+    # persistent volume in a container, or the install zero is lost whenever
+    # the container is recreated.
+    state_dir: Path
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,7 @@ def load_config(
         publish_deadband_deg=node.getfloat("publish_deadband_deg", 0.1),
         heartbeat_s=node.getfloat("heartbeat_s", 30.0),
         error_threshold=node.getint("error_threshold", 3),
+        state_dir=Path(node.get("state_dir", str(DEFAULT_STATE_DIR))),
     )
     _validate(node_config)
 

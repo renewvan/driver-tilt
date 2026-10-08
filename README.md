@@ -31,8 +31,11 @@ so the retained value never goes silently stale.
 
 - `renewvan/tilt/<id>/level_zero/set` — any payload captures the current
   smoothed attitude as the new level (park the van level first). Payload
-  `reset` clears it. The offsets persist in `state/<id>.json`, so a restart
-  keeps the install zero, and the next read republishes immediately.
+  `reset` clears it. The offsets persist in `<state_dir>/<id>.json` (default
+  `state/` next to the package), so a restart keeps the install zero, and the
+  next read republishes immediately. **In a container, mount a persistent
+  volume and set `state_dir` to it** (hub's compose mounts one at `/app/state`),
+  or the zero is lost whenever the container is recreated.
 
 **Node liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
 (3 segments, not 4, same as node-tank).
