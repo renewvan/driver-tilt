@@ -21,10 +21,12 @@ live — there are no identity/startup-only fields:
 - `pitch_deg` — number, degrees, van frame, positive = nose up. 0 = level.
 - `status` — `ok` / `sensor_error` (after `error_threshold` consecutive failed
   I2C reads or all-zero accelerometer reads; angles keep their last
-  published value while in error). Published on transition only. An all-zero
-  read is the MPU-6050's power-on sleep state, which a supply dip puts it back
-  into, so the driver wakes it again and re-reads once (logged at WARNING)
-  before counting a failure. Repeated warnings mean an unstable 5 V supply.
+  published value while in error). Published on transition only. A supply dip
+  puts the MPU-6050 back in its power-on sleep state, where it reads all zeros
+  or keeps returning its last sample frozen. The driver checks the chip's SLEEP
+  bit before each read, and treats an all-zero sample the same way: it wakes
+  the chip again (logged at WARNING) before counting a failure. Repeated
+  warnings mean an unstable 5 V supply.
 
 `roll_deg`/`pitch_deg` are republished when either moves at least
 `publish_deadband_deg` since the last publish, and on a `heartbeat_s` heartbeat

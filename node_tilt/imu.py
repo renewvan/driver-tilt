@@ -18,6 +18,7 @@ _REG_PWR_MGMT_1 = 0x6B
 _REG_ACCEL_CONFIG = 0x1C
 _REG_ACCEL_XOUT_H = 0x3B
 _REG_WHO_AM_I = 0x75
+_PWR_SLEEP_BIT = 0x40
 
 _WHO_AM_I_EXPECTED = 0x68
 _ACCEL_FS_2G = 0x00
@@ -59,14 +60,19 @@ class MPU6050:
     def read_accel_g(self) -> tuple[float, float, float]:
         """Read the accelerometer in g, sensor frame (+/-2 g range).
 
-        An all-zero sample is not a real reading (a resting sensor always sees ~1 g): it is
-        the chip's power-on state, which a supply dip puts it back into. Wake it again and
-        read once more so one brownout does not leave the node in `sensor_error` until the
-        container restarts. A second zero sample is returned as-is for the caller to count.
+        A supply dip puts the chip back in its power-on sleep state. Asleep, it either reads
+        all zeros (after a full reset) or keeps returning its last sample frozen, and both
+        look like a healthy sensor or a plain failure from the outside. So check the SLEEP
+        bit before each sample and wake the chip when it is set; an all-zero sample (no
+        gravity, never real on a resting sensor) is treated the same way. A sample that is
+        still zero after the wake is returned as-is for the caller to count as a failure.
         """
+        if self._bus.read_byte_data(self.address, _REG_PWR_MGMT_1) & _PWR_SLEEP_BIT:
+            logger.warning("MPU-6050 is asleep (supply dip?); waking it again")
+            self._wake()
         raw = self._read_raw()
         if raw == (0, 0, 0):
-            logger.warning("MPU-6050 read all zeros (reset to sleep?); waking it again")
+            logger.warning("MPU-6050 read all zeros; waking it again")
             self._wake()
             raw = self._read_raw()
         ax, ay, az = raw

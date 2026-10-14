@@ -8,37 +8,49 @@ from node_tilt import imu as imu_module
 from node_tilt.imu import MPU6050
 
 GRAVITY_RAW = 16384  # 1 g on the +/-2 g range
+SLEEP_BIT = 0x40
 
 
 class FakeChip:
     """An MPU-6050 that can fall back to its power-on sleep state, like a brownout does.
 
-    While asleep every accelerometer register reads zero; writing PWR_MGMT_1 = 0 wakes it.
+    Two failure modes, both seen on the van's Pi:
+    - `reset()`: a full reset. PWR_MGMT_1 reads 0x40 and every accelerometer register reads 0.
+    - `sleep()`: the SLEEP bit set on a running chip. Reads keep returning the last sample,
+      frozen, so a value check alone cannot tell it from a healthy sensor.
+    Writing PWR_MGMT_1 = 0 wakes it either way.
     """
 
-    def __init__(self, asleep_reads_after_wake: int = 0) -> None:
-        self.asleep = False
+    def __init__(self) -> None:
+        self.pwr_mgmt_1 = 0x00
+        self.sample = (0, 0, GRAVITY_RAW)
         self.wake_count = 0
-        # How many reads after a wake still return zeros (a chip that keeps resetting).
-        self._stubborn = asleep_reads_after_wake
+        self.zero_reads_after_wake = 0  # a chip that is still zero right after waking
         self.closed = False
 
+    def reset(self) -> None:
+        self.pwr_mgmt_1 = SLEEP_BIT
+        self.sample = (0, 0, 0)
+
+    def sleep(self) -> None:
+        self.pwr_mgmt_1 |= SLEEP_BIT
+
     def read_byte_data(self, _addr: int, reg: int) -> int:
-        assert reg == 0x75
-        return 0x68
+        return 0x68 if reg == 0x75 else self.pwr_mgmt_1
 
     def write_byte_data(self, _addr: int, reg: int, value: int) -> None:
         if reg == 0x6B and value == 0x00:
-            self.asleep = False
+            self.pwr_mgmt_1 = 0x00
             self.wake_count += 1
+            if self.sample == (0, 0, 0) and not self.zero_reads_after_wake:
+                self.sample = (0, 0, GRAVITY_RAW)  # a reset chip comes back reading gravity
 
     def read_i2c_block_data(self, _addr: int, _reg: int, length: int) -> list[int]:
         assert length == 6
-        if self.asleep or self._stubborn > 0:
-            if not self.asleep:
-                self._stubborn -= 1
+        if self.zero_reads_after_wake > 0:
+            self.zero_reads_after_wake -= 1
             return [0] * 6
-        return list(struct.pack(">3h", 0, 0, GRAVITY_RAW))
+        return list(struct.pack(">3h", *self.sample))
 
     def close(self) -> None:
         self.closed = True
@@ -58,11 +70,9 @@ def test_reads_gravity_while_the_chip_is_awake(chip: FakeChip) -> None:
     assert chip.wake_count == 1  # only the wake from __post_init__
 
 
-def test_rewakes_and_returns_a_real_sample_after_the_chip_resets_to_sleep(
-    chip: FakeChip,
-) -> None:
+def test_rewakes_after_a_full_reset_reads_zeros(chip: FakeChip) -> None:
     sensor = MPU6050(bus_number=1, address=0x68)
-    chip.asleep = True  # supply dip: the chip is back in its power-on state
+    chip.reset()
 
     assert sensor.read_accel_g() == (0.0, 0.0, 1.0)
     assert chip.wake_count == 2
@@ -71,12 +81,25 @@ def test_rewakes_and_returns_a_real_sample_after_the_chip_resets_to_sleep(
     assert chip.wake_count == 2
 
 
+def test_rewakes_when_the_chip_sleeps_with_frozen_registers(chip: FakeChip) -> None:
+    # The frozen sample is non-zero, so only the SLEEP bit gives it away.
+    sensor = MPU6050(bus_number=1, address=0x68)
+    chip.sample = (-1108, 15308, 2928)
+    chip.sleep()
+
+    assert sensor.read_accel_g() == (-1108 / 16384, 15308 / 16384, 2928 / 16384)
+    assert chip.wake_count == 2
+    assert chip.pwr_mgmt_1 == 0x00
+
+
 def test_a_chip_that_stays_zero_after_the_rewake_is_returned_as_zero(chip: FakeChip) -> None:
     sensor = MPU6050(bus_number=1, address=0x68)
-    chip._stubborn = 2  # the re-wake read is still zero: a real fault, not a one-off reset
+    chip.reset()
+    chip.zero_reads_after_wake = 3  # zero through every wake: a real fault, not a one-off reset
 
     assert sensor.read_accel_g() == (0.0, 0.0, 0.0)  # the caller counts this as an error
-    assert chip.wake_count == 2  # woke once, did not loop
+    # Startup wake, one for the SLEEP bit, one for the zero sample: bounded, never a loop.
+    assert chip.wake_count == 3
 
 
 def test_unexpected_who_am_i_is_still_rejected(chip: FakeChip) -> None:
