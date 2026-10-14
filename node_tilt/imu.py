@@ -6,9 +6,12 @@ reader. Only the accelerometer is used (see tilt_math.py).
 
 from __future__ import annotations
 
+import logging
 import struct
 import time
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 # Register map (MPU-6050 register map rev 4.2)
 _REG_PWR_MGMT_1 = 0x6B
@@ -41,15 +44,32 @@ class MPU6050:
                 f"(expected 0x{_WHO_AM_I_EXPECTED:02x}; clone chips that "
                 "report another ID are not supported)"
             )
-        # Wake from sleep (clears SLEEP bit, selects internal 8 MHz oscillator).
+        self._wake()
+
+    def _wake(self) -> None:
+        """Wake from sleep (clears SLEEP bit, selects the internal 8 MHz oscillator)."""
         self._bus.write_byte_data(self.address, _REG_PWR_MGMT_1, 0x00)
         self._bus.write_byte_data(self.address, _REG_ACCEL_CONFIG, _ACCEL_FS_2G)
         time.sleep(_WAKE_SETTLE_S)
 
-    def read_accel_g(self) -> tuple[float, float, float]:
-        """Read the accelerometer in g, sensor frame (+/-2 g range)."""
+    def _read_raw(self) -> tuple[int, int, int]:
         data = bytes(self._bus.read_i2c_block_data(self.address, _REG_ACCEL_XOUT_H, 6))
-        ax, ay, az = struct.unpack(">3h", data)
+        return struct.unpack(">3h", data)
+
+    def read_accel_g(self) -> tuple[float, float, float]:
+        """Read the accelerometer in g, sensor frame (+/-2 g range).
+
+        An all-zero sample is not a real reading (a resting sensor always sees ~1 g): it is
+        the chip's power-on state, which a supply dip puts it back into. Wake it again and
+        read once more so one brownout does not leave the node in `sensor_error` until the
+        container restarts. A second zero sample is returned as-is for the caller to count.
+        """
+        raw = self._read_raw()
+        if raw == (0, 0, 0):
+            logger.warning("MPU-6050 read all zeros (reset to sleep?); waking it again")
+            self._wake()
+            raw = self._read_raw()
+        ax, ay, az = raw
         return ax / _LSB_PER_G_2G, ay / _LSB_PER_G_2G, az / _LSB_PER_G_2G
 
     def close(self) -> None:
