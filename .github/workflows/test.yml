@@ -18,3 +18,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-test.txt
       - run: pytest tests/ -v --tb=short
+      - name: Validate manifest.json against the hub schema (pinned ref)
+        run: scripts/validate-manifest.sh
