@@ -219,7 +219,7 @@ def test_run_persists_and_restores_level_zero_via_the_configured_state_dir(
         captured: dict = {}
 
         class RunPublisher(FakePublisher):
-            def __init__(self, _config) -> None:
+            def __init__(self, _config, _info_json) -> None:
                 super().__init__()
 
             def connect(self) -> None: ...

@@ -22,6 +22,7 @@ from pathlib import Path
 
 from node_tilt.config import DEFAULT_STATE_DIR, AppConfig, NodeConfig
 from node_tilt.imu import MPU6050
+from node_tilt.info import build_info
 from node_tilt.publisher import Publisher
 from node_tilt.tilt_math import (
     AxisMap,
@@ -209,7 +210,7 @@ def run(config: AppConfig) -> None:
     state = TiltState()
     state.roll_offset, state.pitch_offset = load_offsets(node.id, node.state_dir)
 
-    publisher = Publisher(config.mqtt)
+    publisher = Publisher(config.mqtt, build_info())
     publisher.connect()
     imu = MPU6050(bus_number=node.i2c_bus, address=node.i2c_address)
     publisher.subscribe(

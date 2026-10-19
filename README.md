@@ -45,6 +45,33 @@ so the retained value never goes silently stale.
 **Node liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
 (3 segments, not 4, same as node-tank).
 
+**Node info:** `renewvan/tilt/info` — retained JSON describing this node:
+`node`, `product`, `source`, `publishes` (and `manufacturer`/`homepage`) from
+`manifest.json`, plus `version` and, when available, `host_serial`. It is
+published on **every connect, immediately before `online`**, and stays
+retained when the node goes offline (it is never cleared, not even by the
+last will), so consumers can show "offline, last seen vX".
+
+- **`manifest.json`** (repo root) is the one place the static fields live. It
+  must not contain `version` or `host_serial`. The image build copies it into
+  the package (`node_tilt/manifest.json`); the node reads that copy, and falls
+  back to the repo-root file when run from a checkout. CI validates it with
+  `scripts/validate-manifest.sh` against the hub's `node-manifest` schema at a
+  pinned `renewvan/hub` ref (`HUB_REF` in the script; bump it deliberately).
+- **`version`** is the git release tag, and nothing else: `release.yml` passes
+  it as the `NODE_VERSION` build arg, which the image exposes as an
+  environment variable the node reads. When it is unset or empty (a checkout
+  run, a local `docker build`) the node reports the literal `dev`. There is
+  no `version` file or `__version__`; `pyproject.toml`'s version is a fixed
+  placeholder that nothing reads.
+- **`host_serial`** is the `Serial` line of the host's `/proc/cpuinfo`
+  (readable from a default container, so no compose or Dockerfile change),
+  read once at start. It is omitted, never faked, when the file is
+  unreadable or the serial is missing, empty or all zeros.
+
+`node_tilt/info.py` is deliberately copied into each renewvan Python node
+rather than shared as a package (see hub ADR 0001).
+
 Whether the van counts as "level" is a tolerance the dashboard applies; the
 node publishes angles only. Payload shapes match `hub`'s
 `schema/tilt.schema.json`.

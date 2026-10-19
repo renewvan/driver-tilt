@@ -1,0 +1,8 @@
+{
+  "node": "tilt",
+  "product": "Tilt sensor",
+  "source": "MPU-6050 IMU over I2C",
+  "publishes": ["tilt"],
+  "manufacturer": "renewvan",
+  "homepage": "https://github.com/renewvan/node-tilt"
+}
