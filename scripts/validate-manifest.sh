@@ -11,22 +11,22 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Bump deliberately, together with any manifest change the new schema needs.
-# NOTE: this is hub `main` as of writing. renewvan/hub#36 (the node-manifest
-# schema) had not landed yet, so the file does not exist at this ref: bump it
-# to the commit that adds schema/node-manifest.schema.json.
-HUB_REF="e5808af4eb85ef9d1166bf7455c7432305c5e86b"
+HUB_REF="a334f02d3c82a11c5cf93b345acfde740b1e0d53"
 SCHEMA_URL="https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/node-manifest.schema.json"
 
 manifest="${1:-manifest.json}"
 schema="${MANIFEST_SCHEMA:-}"
 
 if [ -z "$schema" ]; then
-  schema="$(mktemp)"
-  trap 'rm -f "$schema"' EXIT
+  # ajv-cli picks its parser from the file extension: an extensionless temp file fails
+  # with "Unexpected token ':'", so the schema needs a .json name inside a temp dir.
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' EXIT
+  schema="${tmpdir}/node-manifest.schema.json"
   if ! curl --fail --silent --location "$SCHEMA_URL" --output "$schema"; then
     echo "error: cannot fetch the node-manifest schema at hub ref ${HUB_REF}" >&2
     echo "       ${SCHEMA_URL}" >&2
-    echo "       (does that ref contain schema/node-manifest.schema.json? see hub#36)" >&2
+    echo "       (does that ref contain schema/node-manifest.schema.json?)" >&2
     exit 2
   fi
 fi
