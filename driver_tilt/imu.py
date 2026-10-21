@@ -1,6 +1,6 @@
 """Minimal MPU-6050 (GY-521) accelerometer reader over I2C.
 
-Talks to the chip directly via smbus2, same approach as node-tank's ADS1115
+Talks to the chip directly via smbus2, same approach as driver-tank's ADS1115
 reader. Only the accelerometer is used (see tilt_math.py).
 """
 

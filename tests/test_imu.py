@@ -4,8 +4,8 @@ import types
 
 import pytest
 
-from node_tilt import imu as imu_module
-from node_tilt.imu import MPU6050
+from driver_tilt import imu as imu_module
+from driver_tilt.imu import MPU6050
 
 GRAVITY_RAW = 16384  # 1 g on the +/-2 g range
 SLEEP_BIT = 0x40

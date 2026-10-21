@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""node-tilt entrypoint."""
+"""driver-tilt entrypoint."""
 
 from __future__ import annotations
 
@@ -7,12 +7,12 @@ import argparse
 import logging
 from pathlib import Path
 
-from node_tilt.config import DEFAULT_CONFIG_PATH, load_config
-from node_tilt.driver import run
+from driver_tilt.config import DEFAULT_CONFIG_PATH, load_config
+from driver_tilt.driver import run
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="node-tilt: MQTT Tilt node")
+    parser = argparse.ArgumentParser(description="driver-tilt: MQTT Tilt device")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "-c", "--config", default="config.ini", help="Path to local config.ini override"

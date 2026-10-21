@@ -1,8 +1,8 @@
-# node-tilt
+# driver-tilt
 
-Native MQTT node for van inclination: reads a GY-521 (MPU-6050) accelerometer
+Native MQTT device for van inclination: reads a GY-521 (MPU-6050) accelerometer
 over I2C and publishes `roll_deg` / `pitch_deg` to the renewvan bus. Owns the
-sensing directly (no feed remap), same shape as `renewvan/node-tank`: pure
+sensing directly (no feed remap), same shape as `renewvan/driver-tank`: pure
 math (`tilt_math.py`), a layered `config.default.ini`/`config.ini` loader
 (`config.py`), a persistent MQTT publisher with LWT (`publisher.py`), a thin
 publish loop (`driver.py`), a systemd unit, and its own Dockerfile + CI.
@@ -42,44 +42,44 @@ so the retained value never goes silently stale.
   volume and set `state_dir` to it** (hub's compose mounts one at `/app/state`),
   or the zero is lost whenever the container is recreated.
 
-**Node liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
-(3 segments, not 4, same as node-tank).
+**Device liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
+(3 segments, not 4, same as driver-tank).
 
-**Node info:** `renewvan/tilt/info` — retained JSON describing this node:
-`node`, `product`, `source`, `publishes` (and `manufacturer`/`homepage`) from
-`manifest.json`, plus `version` and, when available, `host_serial`. It is
+**Device info:** `renewvan/tilt/info` — retained JSON describing this device:
+`device`, `product`, `source`, `publishes` (and `manufacturer`/`homepage`) from
+`manifest.json`, plus `version` and, when available, `board_serial`. It is
 published on **every connect, immediately before `online`**, and stays
-retained when the node goes offline (it is never cleared, not even by the
+retained when the device goes offline (it is never cleared, not even by the
 last will), so consumers can show "offline, last seen vX".
 
 - **`manifest.json`** (repo root) is the one place the static fields live. It
-  must not contain `version` or `host_serial`. The image build copies it into
-  the package (`node_tilt/manifest.json`); the node reads that copy, and falls
+  must not contain `version` or `board_serial`. The image build copies it into
+  the package (`driver_tilt/manifest.json`); the device reads that copy, and falls
   back to the repo-root file when run from a checkout. CI validates it with
-  `scripts/validate-manifest.sh` against the hub's `node-manifest` schema at a
+  `scripts/validate-manifest.sh` against the hub's `device-manifest` schema at a
   pinned `renewvan/hub` ref (`HUB_REF` in the script; bump it deliberately).
 - **`version`** is the git release tag, and nothing else: `release.yml` passes
-  it as the `NODE_VERSION` build arg, which the image exposes as an
-  environment variable the node reads. When it is unset or empty (a checkout
-  run, a local `docker build`) the node reports the literal `dev`. There is
+  it as the `DEVICE_VERSION` build arg, which the image exposes as an
+  environment variable the device reads. When it is unset or empty (a checkout
+  run, a local `docker build`) the device reports the literal `dev`. There is
   no `version` file or `__version__`; `pyproject.toml`'s version is a fixed
   placeholder that nothing reads.
-- **`host_serial`** is the `Serial` line of the host's `/proc/cpuinfo`
+- **`board_serial`** is the `Serial` line of the board's `/proc/cpuinfo`
   (readable from a default container, so no compose or Dockerfile change),
   read once at start. It is omitted, never faked, when the file is
   unreadable or the serial is missing, empty or all zeros.
 
-`node_tilt/info.py` is deliberately copied into each renewvan Python node
+`driver_tilt/info.py` is deliberately copied into each renewvan Python device
 rather than shared as a package (see hub ADR 0001).
 
 Whether the van counts as "level" is a tolerance the dashboard applies; the
-node publishes angles only. Payload shapes match `hub`'s
+device publishes angles only. Payload shapes match `hub`'s
 `schema/tilt.schema.json`.
 
 ## Wiring
 
 GY-521 on the Pi's I2C bus 1 — the same pins as the ADS1115 used by
-node-tank (they share the bus; the addresses differ, no extra wiring):
+driver-tank (they share the bus; the addresses differ, no extra wiring):
 
 - VCC → 3.3V (Pi pin 1 or 17)
 - GND → GND
@@ -91,11 +91,11 @@ Verify: `i2cdetect -y 1` lists `0x68` (and `0x48` for the ADS1115).
 
 ### Mounting orientation
 
-Mount the board anywhere, in any orientation; tell the node which sensor axis
+Mount the board anywhere, in any orientation; tell the device which sensor axis
 supplies each van axis (van frame: x forward, y left, z up) in `config.ini`:
 
 ```ini
-[node]
+[device]
 ; each value: one of +x -x +y -y +z -z, every sensor axis used exactly once
 axis_x = +x
 axis_y = -y
@@ -122,14 +122,14 @@ the residual mounting error.
 ## Development
 
 ```bash
-git clone git@github.com:renewvan/node-tilt.git
-cd node-tilt
+git clone git@github.com:renewvan/driver-tilt.git
+cd driver-tilt
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt -r requirements-test.txt
 ```
 
 Conversion and decision logic are pure functions tested against fixture
-values — no MQTT broker or MPU-6050 required. `python -m node_tilt.main`
+values — no MQTT broker or MPU-6050 required. `python -m driver_tilt.main`
 itself needs the real chip on I2C, so verify hardware-dependent changes
 on-device per **Running**.
 
@@ -151,13 +151,13 @@ Invalid values (smoothing outside `(0, 1]`, a malformed or repeated axis,
 
 ```bash
 pip install -r requirements.txt
-python -m node_tilt.main --config config.ini
+python -m driver_tilt.main --config config.ini
 ```
 
-Install `node_tilt/systemd/node-tilt.service` to run at boot
+Install `driver_tilt/systemd/driver-tilt.service` to run at boot
 (`Restart=on-failure`) on the Pi the MPU-6050 is wired to. The Docker image
 needs `/dev/i2c-1` passed through (`devices: ["/dev/i2c-1:/dev/i2c-1"]`), as
-node-tank's compose block does.
+driver-tank's compose block does.
 
 ## Testing
 
@@ -169,6 +169,6 @@ pytest tests/ -v
 ## Releasing
 
 Tagging a GitHub release builds and publishes
-`ghcr.io/<owner>/node-tilt:<tag>`, which `hub`'s deployment compose file pins
+`ghcr.io/<owner>/driver-tilt:<tag>`, which `hub`'s deployment compose file pins
 by tag (never builds from source — see
 `hub/docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).

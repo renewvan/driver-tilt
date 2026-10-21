@@ -1,8 +1,8 @@
 import pytest
 
-from node_tilt import publisher as publisher_module
-from node_tilt.config import MqttConfig
-from node_tilt.publisher import HEALTH_TOPIC, INFO_TOPIC, Publisher
+from driver_tilt import publisher as publisher_module
+from driver_tilt.config import MqttConfig
+from driver_tilt.publisher import HEALTH_TOPIC, INFO_TOPIC, Publisher
 
 MQTT = MqttConfig(
     host="localhost",
@@ -14,7 +14,7 @@ MQTT = MqttConfig(
     reconnect_max_delay=2,
 )
 
-INFO = '{"node": "tilt", "version": "dev"}'
+INFO = '{"device": "tilt", "version": "dev"}'
 
 
 class FakeClient:
@@ -80,7 +80,7 @@ def test_failed_connect_publishes_nothing(client) -> None:
     assert client.published == []
 
 
-def test_info_stays_retained_when_the_node_goes_offline(monkeypatch) -> None:
+def test_info_stays_retained_when_the_device_goes_offline(monkeypatch) -> None:
     fake = FakeClient()
     monkeypatch.setattr(publisher_module.mqtt, "Client", lambda *a, **k: fake)
     publisher = Publisher(MQTT, INFO)

@@ -1,9 +1,9 @@
 """Persistent MQTT connection with LWT and a retained-topic publish helper.
 
-Shared boilerplate across every renewvan/node-* repo (see
-node-tank/node_tank/publisher.py): connect with retry/backoff, an LWT on a
-health topic so downstream consumers can detect a dead node, and a
-long-lived connection -- this node is the source of truth, not a
+Shared boilerplate across every renewvan/driver-* repo (see
+driver-tank/driver_tank/publisher.py): connect with retry/backoff, an LWT on a
+health topic so downstream consumers can detect a dead device, and a
+long-lived connection -- this device is the source of truth, not a
 re-publisher.
 """
 
@@ -14,7 +14,7 @@ from typing import Callable
 
 import paho.mqtt.client as mqtt
 
-from node_tilt.config import MqttConfig
+from driver_tilt.config import MqttConfig
 
 logger = logging.getLogger(__name__)
 

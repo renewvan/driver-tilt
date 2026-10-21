@@ -20,11 +20,11 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from node_tilt.config import DEFAULT_STATE_DIR, AppConfig, NodeConfig
-from node_tilt.imu import MPU6050
-from node_tilt.info import build_info
-from node_tilt.publisher import Publisher
-from node_tilt.tilt_math import (
+from driver_tilt.config import DEFAULT_STATE_DIR, AppConfig, DeviceConfig
+from driver_tilt.imu import MPU6050
+from driver_tilt.info import build_info
+from driver_tilt.publisher import Publisher
+from driver_tilt.tilt_math import (
     AxisMap,
     apply_offset,
     ema,
@@ -36,7 +36,7 @@ from node_tilt.tilt_math import (
 logger = logging.getLogger(__name__)
 
 # Default state directory for machine-written persistence (same convention as
-# node-tank); `state_dir` in config.ini overrides it per install.
+# driver-tank); `state_dir` in config.ini overrides it per install.
 _STATE_DIR = DEFAULT_STATE_DIR
 
 
@@ -55,58 +55,58 @@ class TiltState:
     last_publish_at: float = 0.0
 
 
-def _topic(node_id: str, prop: str) -> str:
-    return f"renewvan/tilt/{node_id}/{prop}"
+def _topic(device_id: str, prop: str) -> str:
+    return f"renewvan/tilt/{device_id}/{prop}"
 
 
-def _state_path(node_id: str, state_dir: Path = _STATE_DIR) -> Path:
-    return state_dir / f"{node_id}.json"
+def _state_path(device_id: str, state_dir: Path = _STATE_DIR) -> Path:
+    return state_dir / f"{device_id}.json"
 
 
-def load_offsets(node_id: str, state_dir: Path = _STATE_DIR) -> tuple[float, float]:
+def load_offsets(device_id: str, state_dir: Path = _STATE_DIR) -> tuple[float, float]:
     """Load (roll_offset, pitch_offset) from state, or (0, 0) if absent/unreadable."""
-    path = _state_path(node_id, state_dir)
+    path = _state_path(device_id, state_dir)
     if not path.exists():
         return 0.0, 0.0
     try:
         data = json.loads(path.read_text())
         return float(data.get("roll_offset_deg", 0.0)), float(data.get("pitch_offset_deg", 0.0))
     except (OSError, ValueError, TypeError) as e:
-        logger.warning("Failed to load state for %s: %s", node_id, e)
+        logger.warning("Failed to load state for %s: %s", device_id, e)
         return 0.0, 0.0
 
 
-def save_offsets(node_id: str, roll: float, pitch: float, state_dir: Path = _STATE_DIR) -> bool:
+def save_offsets(device_id: str, roll: float, pitch: float, state_dir: Path = _STATE_DIR) -> bool:
     """Persist offsets. Returns False (and logs) on failure -- the in-memory
     zero still applies until restart, so the caller must not treat this as fatal."""
     try:
         state_dir.mkdir(exist_ok=True, parents=True)
-        _state_path(node_id, state_dir).write_text(
+        _state_path(device_id, state_dir).write_text(
             json.dumps({"roll_offset_deg": roll, "pitch_offset_deg": pitch})
         )
         return True
     except OSError as e:
-        logger.error("Failed to save state for %s: %s", node_id, e)
+        logger.error("Failed to save state for %s: %s", device_id, e)
         return False
 
 
 def compute_sample(
-    accel: tuple[float, float, float], node: NodeConfig, state: TiltState, axis_map: AxisMap
+    accel: tuple[float, float, float], device: DeviceConfig, state: TiltState, axis_map: AxisMap
 ) -> None:
     """Fold one accelerometer sample into the smoothed attitude in `state`.
 
     Samples outside the gravity band are dynamic (braking, cornering, bumps)
     and are skipped once an estimate exists. The very first sample always
-    seeds the estimate so the node publishes something at startup.
+    seeds the estimate so the device publishes something at startup.
     """
     van = remap_axes(accel, axis_map)
     roll, pitch = roll_pitch_deg(van)  # ValueError on a zero vector
     if state.roll_smoothed is not None and not plausible_gravity(
-        van, node.gravity_min_g, node.gravity_max_g
+        van, device.gravity_min_g, device.gravity_max_g
     ):
         return
-    state.roll_smoothed = ema(state.roll_smoothed, roll, node.smoothing_alpha)
-    state.pitch_smoothed = ema(state.pitch_smoothed, pitch, node.smoothing_alpha)
+    state.roll_smoothed = ema(state.roll_smoothed, roll, device.smoothing_alpha)
+    state.pitch_smoothed = ema(state.pitch_smoothed, pitch, device.smoothing_alpha)
 
 
 def corrected(state: TiltState) -> tuple[float, float] | None:
@@ -120,53 +120,57 @@ def corrected(state: TiltState) -> tuple[float, float] | None:
 
 
 def should_publish_angles(
-    roll: float, pitch: float, state: TiltState, node: NodeConfig, now: float
+    roll: float, pitch: float, state: TiltState, device: DeviceConfig, now: float
 ) -> bool:
     if state.last_published_roll is None or state.last_published_pitch is None:
         return True
-    if now - state.last_publish_at >= node.heartbeat_s:
+    if now - state.last_publish_at >= device.heartbeat_s:
         return True
     return (
-        abs(roll - state.last_published_roll) >= node.publish_deadband_deg
-        or abs(pitch - state.last_published_pitch) >= node.publish_deadband_deg
+        abs(roll - state.last_published_roll) >= device.publish_deadband_deg
+        or abs(pitch - state.last_published_pitch) >= device.publish_deadband_deg
     )
 
 
-def _publish_status(publisher: Publisher, node: NodeConfig, state: TiltState, status: str) -> None:
+def _publish_status(
+    publisher: Publisher, device: DeviceConfig, state: TiltState, status: str
+) -> None:
     if status != state.last_status:
-        publisher.publish(_topic(node.id, "status"), json.dumps(status))
+        publisher.publish(_topic(device.id, "status"), json.dumps(status))
         state.last_status = status
 
 
 def read_and_publish(
     publisher: Publisher,
     imu: MPU6050,
-    node: NodeConfig,
+    device: DeviceConfig,
     state: TiltState,
     axis_map: AxisMap,
     now: float,
 ) -> None:
     try:
         accel = imu.read_accel_g()
-        compute_sample(accel, node, state, axis_map)
+        compute_sample(accel, device, state, axis_map)
     except (OSError, ValueError) as e:
         state.consecutive_errors += 1
-        logger.warning("Read failed (%d/%d): %s", state.consecutive_errors, node.error_threshold, e)
-        if state.consecutive_errors >= node.error_threshold:
-            _publish_status(publisher, node, state, "sensor_error")
+        logger.warning(
+            "Read failed (%d/%d): %s", state.consecutive_errors, device.error_threshold, e
+        )
+        if state.consecutive_errors >= device.error_threshold:
+            _publish_status(publisher, device, state, "sensor_error")
         return
 
     state.consecutive_errors = 0
-    _publish_status(publisher, node, state, "ok")
+    _publish_status(publisher, device, state, "ok")
 
     angles = corrected(state)
     if angles is None:
         return
     roll, pitch = angles
-    if not should_publish_angles(roll, pitch, state, node, now):
+    if not should_publish_angles(roll, pitch, state, device, now):
         return
-    publisher.publish(_topic(node.id, "roll_deg"), json.dumps(round(roll, 2)))
-    publisher.publish(_topic(node.id, "pitch_deg"), json.dumps(round(pitch, 2)))
+    publisher.publish(_topic(device.id, "roll_deg"), json.dumps(round(roll, 2)))
+    publisher.publish(_topic(device.id, "pitch_deg"), json.dumps(round(pitch, 2)))
     state.last_published_roll = roll
     state.last_published_pitch = pitch
     state.last_publish_at = now
@@ -175,7 +179,7 @@ def read_and_publish(
 
 def handle_level_zero_command(
     publisher: Publisher,
-    node: NodeConfig,
+    device: DeviceConfig,
     state: TiltState,
     payload: str,
     state_dir: Path = _STATE_DIR,
@@ -200,31 +204,33 @@ def handle_level_zero_command(
             state.roll_offset,
             state.pitch_offset,
         )
-    save_offsets(node.id, state.roll_offset, state.pitch_offset, state_dir)
+    save_offsets(device.id, state.roll_offset, state.pitch_offset, state_dir)
     state.last_published_roll = None  # force the next read to publish
 
 
 def run(config: AppConfig) -> None:
-    node = config.node
-    axis_map = AxisMap(node.axis_x, node.axis_y, node.axis_z)
+    device = config.device
+    axis_map = AxisMap(device.axis_x, device.axis_y, device.axis_z)
     state = TiltState()
-    state.roll_offset, state.pitch_offset = load_offsets(node.id, node.state_dir)
+    state.roll_offset, state.pitch_offset = load_offsets(device.id, device.state_dir)
 
     publisher = Publisher(config.mqtt, build_info())
     publisher.connect()
-    imu = MPU6050(bus_number=node.i2c_bus, address=node.i2c_address)
+    imu = MPU6050(bus_number=device.i2c_bus, address=device.i2c_address)
     publisher.subscribe(
-        _topic(node.id, "level_zero/set"),
-        lambda payload: handle_level_zero_command(publisher, node, state, payload, node.state_dir),
+        _topic(device.id, "level_zero/set"),
+        lambda payload: handle_level_zero_command(
+            publisher, device, state, payload, device.state_dir
+        ),
     )
 
     try:
         while True:
             try:
-                read_and_publish(publisher, imu, node, state, axis_map, time.time())
+                read_and_publish(publisher, imu, device, state, axis_map, time.time())
             except Exception:
                 logger.exception("Unexpected failure in read/publish")
-            time.sleep(node.update_interval_ms / 1000)
+            time.sleep(device.update_interval_ms / 1000)
     except KeyboardInterrupt:
         logger.info("Shutting down")
     finally:

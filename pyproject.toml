@@ -1,7 +1,7 @@
 [project]
-name = "node-tilt"
-version = "0.0.0"  # placeholder: the git release tag is the only version source (NODE_VERSION)
-description = "Van inclination (roll/pitch) node: reads a GY-521 / MPU-6050 IMU over I2C and publishes level to the renewvan MQTT bus"
+name = "driver-tilt"
+version = "0.0.0"  # placeholder: the git release tag is the only version source (DEVICE_VERSION)
+description = "Van inclination (roll/pitch) device: reads a GY-521 / MPU-6050 IMU over I2C and publishes level to the renewvan MQTT bus"
 requires-python = ">=3.11"
 dependencies = [
     "paho-mqtt>=1.6,<2",
@@ -13,7 +13,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["node_tilt*"]
+include = ["driver_tilt*"]
 
 [tool.ruff]
 line-length = 100

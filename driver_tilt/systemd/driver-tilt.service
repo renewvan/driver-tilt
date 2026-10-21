@@ -1,0 +1,15 @@
+[Unit]
+Description=driver-tilt MQTT device
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/driver-tilt
+ExecStart=/opt/driver-tilt/.venv/bin/python -m driver_tilt.main --config /opt/driver-tilt/config.ini
+Restart=on-failure
+RestartSec=5
+User=renewvan
+
+[Install]
+WantedBy=multi-user.target
