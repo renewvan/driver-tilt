@@ -1,8 +1,8 @@
 """Layered INI config: config.default.ini (shipped) + config.ini (local
 override).
 
-Same two-file pattern as every renewvan/node-* repo (see
-node-tank/node_tank/config.py): config.default.ini ships every key with a
+Same two-file pattern as every renewvan/driver-* repo (see
+driver-tank/driver_tank/config.py): config.default.ini ships every key with a
 safe default and is never edited at an install; config.ini is a gitignored,
 install-local file that overrides only what differs.
 """
@@ -14,7 +14,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-from node_tilt.tilt_math import AxisMap
+from driver_tilt.tilt_math import AxisMap
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class MqttConfig:
 
 
 @dataclass(frozen=True)
-class NodeConfig:
+class DeviceConfig:
     id: str  # topic path segment, e.g. renewvan/tilt/<id>/...
     update_interval_ms: int
     i2c_bus: int
@@ -64,7 +64,7 @@ class NodeConfig:
 @dataclass(frozen=True)
 class AppConfig:
     mqtt: MqttConfig
-    node: NodeConfig
+    device: DeviceConfig
 
 
 def load_config(
@@ -79,25 +79,25 @@ def load_config(
         logger.info("No local config override at %s; using defaults only", local_path)
 
     mqtt = parser["mqtt"]
-    node = parser["node"]
+    device = parser["device"]
 
-    node_config = NodeConfig(
-        id=node.get("id", "tilt"),
-        update_interval_ms=node.getint("update_interval_ms", 500),
-        i2c_bus=node.getint("i2c_bus", 1),
-        i2c_address=int(node.get("i2c_address", "0x68"), 0),
-        axis_x=node.get("axis_x", "+x").strip(),
-        axis_y=node.get("axis_y", "+y").strip(),
-        axis_z=node.get("axis_z", "+z").strip(),
-        smoothing_alpha=node.getfloat("smoothing_alpha", 0.2),
-        gravity_min_g=node.getfloat("gravity_min_g", 0.8),
-        gravity_max_g=node.getfloat("gravity_max_g", 1.25),
-        publish_deadband_deg=node.getfloat("publish_deadband_deg", 0.1),
-        heartbeat_s=node.getfloat("heartbeat_s", 30.0),
-        error_threshold=node.getint("error_threshold", 3),
-        state_dir=Path(node.get("state_dir", str(DEFAULT_STATE_DIR))),
+    device_config = DeviceConfig(
+        id=device.get("id", "tilt"),
+        update_interval_ms=device.getint("update_interval_ms", 500),
+        i2c_bus=device.getint("i2c_bus", 1),
+        i2c_address=int(device.get("i2c_address", "0x68"), 0),
+        axis_x=device.get("axis_x", "+x").strip(),
+        axis_y=device.get("axis_y", "+y").strip(),
+        axis_z=device.get("axis_z", "+z").strip(),
+        smoothing_alpha=device.getfloat("smoothing_alpha", 0.2),
+        gravity_min_g=device.getfloat("gravity_min_g", 0.8),
+        gravity_max_g=device.getfloat("gravity_max_g", 1.25),
+        publish_deadband_deg=device.getfloat("publish_deadband_deg", 0.1),
+        heartbeat_s=device.getfloat("heartbeat_s", 30.0),
+        error_threshold=device.getint("error_threshold", 3),
+        state_dir=Path(device.get("state_dir", str(DEFAULT_STATE_DIR))),
     )
-    _validate(node_config)
+    _validate(device_config)
 
     return AppConfig(
         mqtt=MqttConfig(
@@ -105,28 +105,28 @@ def load_config(
             port=mqtt.getint("port", 1883),
             username=mqtt.get("username") or None,
             password=mqtt.get("password") or None,
-            client_id=mqtt.get("client_id", "node-tilt"),
+            client_id=mqtt.get("client_id", "driver-tilt"),
             reconnect_min_delay=mqtt.getfloat("reconnect_min_delay", 1.0),
             reconnect_max_delay=mqtt.getfloat("reconnect_max_delay", 30.0),
         ),
-        node=node_config,
+        device=device_config,
     )
 
 
-def _validate(node: NodeConfig) -> None:
+def _validate(device: DeviceConfig) -> None:
     """Fail at startup on config that would otherwise misbehave at runtime."""
-    if not 0.0 < node.smoothing_alpha <= 1.0:
-        raise ValueError(f"smoothing_alpha must be in (0, 1]; got {node.smoothing_alpha}")
-    if not 0.0 < node.gravity_min_g < node.gravity_max_g:
+    if not 0.0 < device.smoothing_alpha <= 1.0:
+        raise ValueError(f"smoothing_alpha must be in (0, 1]; got {device.smoothing_alpha}")
+    if not 0.0 < device.gravity_min_g < device.gravity_max_g:
         raise ValueError(
             f"need 0 < gravity_min_g < gravity_max_g; got "
-            f"{node.gravity_min_g}..{node.gravity_max_g}"
+            f"{device.gravity_min_g}..{device.gravity_max_g}"
         )
-    if node.update_interval_ms <= 0:
-        raise ValueError(f"update_interval_ms must be > 0; got {node.update_interval_ms}")
-    if node.publish_deadband_deg < 0 or node.heartbeat_s <= 0:
+    if device.update_interval_ms <= 0:
+        raise ValueError(f"update_interval_ms must be > 0; got {device.update_interval_ms}")
+    if device.publish_deadband_deg < 0 or device.heartbeat_s <= 0:
         raise ValueError("publish_deadband_deg must be >= 0 and heartbeat_s > 0")
-    if node.error_threshold < 1:
-        raise ValueError(f"error_threshold must be >= 1; got {node.error_threshold}")
+    if device.error_threshold < 1:
+        raise ValueError(f"error_threshold must be >= 1; got {device.error_threshold}")
     # Raises ValueError with a precise message on a bad/degenerate mapping.
-    AxisMap(node.axis_x, node.axis_y, node.axis_z)
+    AxisMap(device.axis_x, device.axis_y, device.axis_z)

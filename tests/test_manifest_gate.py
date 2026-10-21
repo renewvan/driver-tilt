@@ -3,7 +3,7 @@ stamped field and accept the real one.
 
 The real schema lives in renewvan/hub and CI fetches it at a pinned ref. These tests
 run the actual script against a MINIMAL STAND-IN with the same contract (draft-07,
-additionalProperties false, no `version`/`host_serial` property), so the gate's
+additionalProperties false, no `version`/`board_serial` property), so the gate's
 pass/fail behaviour is proven without network access. It is deliberately not a copy
 of the hub schema and is not kept in sync with it: the hub schema's exact rules are
 hub's to test."""
@@ -21,10 +21,10 @@ SCRIPT = ROOT / "scripts" / "validate-manifest.sh"
 STAND_IN_SCHEMA = {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "type": "object",
-    "required": ["node", "product", "source", "publishes"],
+    "required": ["device", "product", "source", "publishes"],
     "additionalProperties": False,
     "properties": {
-        "node": {"type": "string"},
+        "device": {"type": "string"},
         "product": {"type": "string"},
         "source": {"type": "string"},
         "publishes": {"type": "array", "minItems": 1, "items": {"type": "string"}},
@@ -60,7 +60,7 @@ def test_gate_passes_on_the_real_manifest(schema) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.parametrize("field", ["version", "host_serial"])
+@pytest.mark.parametrize("field", ["version", "board_serial"])
 def test_gate_fails_on_a_manifest_containing_a_stamped_field(tmp_path, schema, field) -> None:
     manifest = json.loads((ROOT / "manifest.json").read_text())
     manifest[field] = "v1.0.0"

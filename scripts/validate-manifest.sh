@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Validates manifest.json against the hub's node-manifest schema.
+# Validates manifest.json against the hub's device-manifest schema.
 #
 # Usage: scripts/validate-manifest.sh [manifest.json]
 #
@@ -11,8 +11,8 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Bump deliberately, together with any manifest change the new schema needs.
-HUB_REF="a334f02d3c82a11c5cf93b345acfde740b1e0d53"
-SCHEMA_URL="https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/node-manifest.schema.json"
+HUB_REF="57c0928fcc4636cb9d3c1f7914fcb2d012baa723"
+SCHEMA_URL="https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/device-manifest.schema.json"
 
 manifest="${1:-manifest.json}"
 schema="${MANIFEST_SCHEMA:-}"
@@ -22,11 +22,11 @@ if [ -z "$schema" ]; then
   # with "Unexpected token ':'", so the schema needs a .json name inside a temp dir.
   tmpdir="$(mktemp -d)"
   trap 'rm -rf "$tmpdir"' EXIT
-  schema="${tmpdir}/node-manifest.schema.json"
+  schema="${tmpdir}/device-manifest.schema.json"
   if ! curl --fail --silent --location "$SCHEMA_URL" --output "$schema"; then
-    echo "error: cannot fetch the node-manifest schema at hub ref ${HUB_REF}" >&2
+    echo "error: cannot fetch the device-manifest schema at hub ref ${HUB_REF}" >&2
     echo "       ${SCHEMA_URL}" >&2
-    echo "       (does that ref contain schema/node-manifest.schema.json?)" >&2
+    echo "       (does that ref contain schema/device-manifest.schema.json?)" >&2
     exit 2
   fi
 fi

@@ -1,4 +1,4 @@
-; node-tilt — local configuration
+; driver-tilt — local configuration
 ; ======================================
 ; Copy this file to config.ini and override only what differs from
 ; config.default.ini. config.ini is gitignored — it holds this
@@ -7,7 +7,7 @@
 [mqtt]
 host = 192.168.1.10
 
-[node]
+[device]
 ; Board mounted face-down, X toward the front of the van. Adjust to your
 ; mounting; see README "Mounting orientation".
 axis_x = +x

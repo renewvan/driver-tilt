@@ -1,6 +1,6 @@
-# node-tilt
+# driver-tilt
 
-Domain glossary for node-tilt: what each published field *means*,
+Domain glossary for driver-tilt: what each published field *means*,
 independent of the Python that computes it. Entity-level vocabulary
 (**Tilt**) lives in `hub/CONTEXT.md`.
 
