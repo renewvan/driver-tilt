@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # Bump deliberately, together with any manifest change the new schema needs.
-HUB_REF="a334f02d3c82a11c5cf93b345acfde740b1e0d53"
+HUB_REF="57c0928fcc4636cb9d3c1f7914fcb2d012baa723"
 SCHEMA_URL="https://raw.githubusercontent.com/renewvan/hub/${HUB_REF}/schema/device-manifest.schema.json"
 
 manifest="${1:-manifest.json}"
