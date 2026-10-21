@@ -8,15 +8,4 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-test.txt
-      - run: pytest tests/ -v --tb=short
-      - name: Validate manifest.json against the hub schema (pinned ref)
-        run: scripts/validate-manifest.sh
+    uses: renewvan/hub/.github/workflows/python-test.yml@eb9ad8a4b29519bbbd1c33b1092cdb7719628ec9

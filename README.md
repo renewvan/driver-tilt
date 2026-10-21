@@ -55,9 +55,10 @@ last will), so consumers can show "offline, last seen vX".
 - **`manifest.json`** (repo root) is the one place the static fields live. It
   must not contain `version` or `board_serial`. The image build copies it into
   the package (`driver_tilt/manifest.json`); the device reads that copy, and falls
-  back to the repo-root file when run from a checkout. CI validates it with
-  `scripts/validate-manifest.sh` against the hub's `device-manifest` schema at a
-  pinned `renewvan/hub` ref (`HUB_REF` in the script; bump it deliberately).
+  back to the repo-root file when run from a checkout. CI validates it
+  against the hub's `device-manifest` schema through hub's reusable manifest
+  workflow (`.github/workflows/manifest.yml`; its `hub-ref` is the same pinned hub
+  commit as the workflow itself, bump both together).
 - **`version`** is the git release tag, and nothing else: `release.yml` passes
   it as the `DEVICE_VERSION` build arg, which the image exposes as an
   environment variable the device reads. When it is unset or empty (a checkout
@@ -168,7 +169,15 @@ pytest tests/ -v
 
 ## Releasing
 
-Tagging a GitHub release builds and publishes
-`ghcr.io/<owner>/driver-tilt:<tag>`, which `hub`'s deployment compose file pins
+Start a release from **Actions → Release → Run workflow**, or
+`gh workflow run release.yml -f bump=minor` (`patch`, `major`, or `-f version=0.2.0`
+to set it explicitly). One run works out the next version from the latest `v*` tag,
+tags `main`, creates the GitHub release and builds and publishes
+`ghcr.io/<owner>/driver-tilt:<tag>` (and `:latest`), which `hub`'s deployment compose file pins
 by tag (never builds from source — see
 `hub/docs/adr/0001-compose-services-via-pinned-images-not-git-submodules.md`).
+
+A beta from a feature branch: dispatch the workflow on that branch with **prerelease**
+ticked. It runs the tests, publishes only its own tag (never `:latest`) and writes nothing
+to `main`. The process is shared by every renewvan repo and lives in `hub` (`hub/docs/adr/0015-one-release-process-via-reusable-workflows.md`);
+this repo's `release.yml` only says what it ships.
