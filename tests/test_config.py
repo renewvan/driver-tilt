@@ -8,9 +8,9 @@ from driver_tilt.config import DEFAULT_STATE_DIR, load_config
 def test_load_config_defaults() -> None:
     config = load_config()
     assert config.mqtt.port == 1883
-    assert config.device.id == "tilt"
-    assert config.device.i2c_address == 0x68
-    assert (config.device.axis_x, config.device.axis_y, config.device.axis_z) == ("+x", "+y", "+z")
+    assert config.driver.id == "tilt"
+    assert config.driver.i2c_address == 0x68
+    assert (config.driver.axis_x, config.driver.axis_y, config.driver.axis_z) == ("+x", "+y", "+z")
 
 
 def test_load_config_local_override(tmp_path: Path) -> None:
@@ -20,13 +20,13 @@ def test_load_config_local_override(tmp_path: Path) -> None:
     assert config.mqtt.host == "192.168.1.50"
 
 
-def test_device_override_layers_over_defaults(tmp_path: Path) -> None:
+def test_driver_override_layers_over_defaults(tmp_path: Path) -> None:
     local = tmp_path / "config.ini"
-    local.write_text("[device]\ni2c_address = 0x69\naxis_y = -y\naxis_z = -z\n")
-    device = load_config(local_path=local).device
-    assert device.i2c_address == 0x69
-    assert (device.axis_x, device.axis_y, device.axis_z) == ("+x", "-y", "-z")
-    assert device.update_interval_ms == 500  # untouched default
+    local.write_text("[driver]\ni2c_address = 0x69\naxis_y = -y\naxis_z = -z\n")
+    driver_config = load_config(local_path=local).driver
+    assert driver_config.i2c_address == 0x69
+    assert (driver_config.axis_x, driver_config.axis_y, driver_config.axis_z) == ("+x", "-y", "-z")
+    assert driver_config.update_interval_ms == 500  # untouched default
 
 
 @pytest.mark.parametrize(
@@ -42,15 +42,15 @@ def test_device_override_layers_over_defaults(tmp_path: Path) -> None:
         "axis_z = up",
     ],
 )
-def test_invalid_device_config_fails_at_load(tmp_path: Path, override: str) -> None:
+def test_invalid_driver_config_fails_at_load(tmp_path: Path, override: str) -> None:
     local = tmp_path / "config.ini"
-    local.write_text(f"[device]\n{override}\n")
+    local.write_text(f"[driver]\n{override}\n")
     with pytest.raises(ValueError):
         load_config(local_path=local)
 
 
 def test_state_dir_defaults_to_package_state_and_is_overridable(tmp_path: Path) -> None:
-    assert load_config().device.state_dir == DEFAULT_STATE_DIR
+    assert load_config().driver.state_dir == DEFAULT_STATE_DIR
     local = tmp_path / "config.ini"
-    local.write_text("[device]\nstate_dir = /data/tilt\n")
-    assert load_config(local_path=local).device.state_dir == Path("/data/tilt")
+    local.write_text("[driver]\nstate_dir = /data/tilt\n")
+    assert load_config(local_path=local).driver.state_dir == Path("/data/tilt")

@@ -1,5 +1,5 @@
 [Unit]
-Description=driver-tilt MQTT device
+Description=driver-tilt MQTT Driver
 After=network-online.target
 Wants=network-online.target
 

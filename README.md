@@ -1,6 +1,6 @@
 # driver-tilt
 
-Native MQTT device for van inclination: reads a GY-521 (MPU-6050) accelerometer
+Native MQTT Driver for van inclination: reads a GY-521 (MPU-6050) accelerometer
 over I2C and publishes `roll_deg` / `pitch_deg` to the renewvan bus. Owns the
 sensing directly (no feed remap), same shape as `renewvan/driver-tank`: pure
 math (`tilt_math.py`), a layered `config.default.ini`/`config.ini` loader
@@ -14,9 +14,14 @@ Samples taken under braking/cornering/bumps (acceleration magnitude outside
 
 ## Topics published
 
-Retained, under `renewvan/tilt/<id>/` (default id `tilt`). All fields are
-live — there are no identity/startup-only fields:
+Retained, under `renewvan/tilt/<id>/` (default id `tilt`). One identity field,
+the rest live:
 
+- `driver` — JSON string, always `"tilt"`: this Driver's key, the same slug as
+  the `renewvan/tilt/info` segment, so consumers can attribute the instance to
+  its owning Driver. Published on **every connect, after `info` and before
+  `online`**, so a retained copy exists the moment the Driver is seen online.
+  Consumers must tolerate it being absent (an older Driver).
 - `roll_deg` — number, degrees, van frame, positive = left side down. 0 = level.
 - `pitch_deg` — number, degrees, van frame, positive = nose up. 0 = level.
 - `status` — `ok` / `sensor_error` (after `error_threshold` consecutive failed
@@ -42,27 +47,27 @@ so the retained value never goes silently stale.
   volume and set `state_dir` to it** (hub's compose mounts one at `/app/state`),
   or the zero is lost whenever the container is recreated.
 
-**Device liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
+**Driver liveness:** `renewvan/tilt/health` — `online`/`offline` via MQTT LWT
 (3 segments, not 4, same as driver-tank).
 
-**Device info:** `renewvan/tilt/info` — retained JSON describing this device:
-`device`, `product`, `source`, `publishes` (and `manufacturer`/`homepage`) from
+**Driver info:** `renewvan/tilt/info` — retained JSON describing this Driver:
+`driver`, `product`, `source`, `publishes` (and `manufacturer`/`homepage`) from
 `manifest.json`, plus `version` and, when available, `board_serial`. It is
 published on **every connect, immediately before `online`**, and stays
-retained when the device goes offline (it is never cleared, not even by the
+retained when the Driver goes offline (it is never cleared, not even by the
 last will), so consumers can show "offline, last seen vX".
 
 - **`manifest.json`** (repo root) is the one place the static fields live. It
   must not contain `version` or `board_serial`. The image build copies it into
-  the package (`driver_tilt/manifest.json`); the device reads that copy, and falls
+  the package (`driver_tilt/manifest.json`); the Driver reads that copy, and falls
   back to the repo-root file when run from a checkout. CI validates it
-  against the hub's `device-manifest` schema through hub's reusable manifest
+  against the hub's `driver-manifest` schema through hub's reusable manifest
   workflow (`.github/workflows/manifest.yml`; its `hub-ref` is the same pinned hub
   commit as the workflow itself, bump both together).
 - **`version`** is the git release tag, and nothing else: `release.yml` passes
-  it as the `DEVICE_VERSION` build arg, which the image exposes as an
-  environment variable the device reads. When it is unset or empty (a checkout
-  run, a local `docker build`) the device reports the literal `dev`. There is
+  it as the `DRIVER_VERSION` build arg, which the image exposes as an
+  environment variable the Driver reads. When it is unset or empty (a checkout
+  run, a local `docker build`) the Driver reports the literal `dev`. There is
   no `version` file or `__version__`; `pyproject.toml`'s version is a fixed
   placeholder that nothing reads.
 - **`board_serial`** is the `Serial` line of the board's `/proc/cpuinfo`
@@ -70,11 +75,11 @@ last will), so consumers can show "offline, last seen vX".
   read once at start. It is omitted, never faked, when the file is
   unreadable or the serial is missing, empty or all zeros.
 
-`driver_tilt/info.py` is deliberately copied into each renewvan Python device
+`driver_tilt/info.py` is deliberately copied into each renewvan Python Driver
 rather than shared as a package (see hub ADR 0001).
 
 Whether the van counts as "level" is a tolerance the dashboard applies; the
-device publishes angles only. Payload shapes match `hub`'s
+Driver publishes angles only. Payload shapes match `hub`'s
 `schema/tilt.schema.json`.
 
 ## Wiring
@@ -92,11 +97,11 @@ Verify: `i2cdetect -y 1` lists `0x68` (and `0x48` for the ADS1115).
 
 ### Mounting orientation
 
-Mount the board anywhere, in any orientation; tell the device which sensor axis
+Mount the board anywhere, in any orientation; tell the Driver which sensor axis
 supplies each van axis (van frame: x forward, y left, z up) in `config.ini`:
 
 ```ini
-[device]
+[driver]
 ; each value: one of +x -x +y -y +z -z, every sensor axis used exactly once
 axis_x = +x
 axis_y = -y
@@ -145,6 +150,9 @@ the repos are only coupled at the schema-version level).
 `config.default.ini` ships every key with a default and documents each.
 Copy `config.ini.example` to `config.ini` (gitignored) and override only what
 differs — broker host and the axis mapping for your mounting orientation.
+The settings live in the `[driver]` section (it was `[device]` before the
+Device → Driver rename): an existing `config.ini` keeps working only once its
+`[device]` header is renamed to `[driver]`; there is no fallback.
 Invalid values (smoothing outside `(0, 1]`, a malformed or repeated axis,
 `gravity_min_g >= gravity_max_g`, …) fail at startup.
 

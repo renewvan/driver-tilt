@@ -14,7 +14,9 @@ MQTT = MqttConfig(
     reconnect_max_delay=2,
 )
 
-INFO = '{"device": "tilt", "version": "dev"}'
+INFO = '{"driver": "tilt", "version": "dev"}'
+DRIVER_TOPIC = "renewvan/tilt/tilt/driver"
+IDENTITY = {DRIVER_TOPIC: '"tilt"'}
 
 
 class FakeClient:
@@ -55,22 +57,28 @@ class FakeClient:
 def client(monkeypatch) -> FakeClient:
     fake = FakeClient()
     monkeypatch.setattr(publisher_module.mqtt, "Client", lambda *a, **k: fake)
-    Publisher(MQTT, INFO).connect()
+    Publisher(MQTT, INFO, IDENTITY).connect()
     return fake
 
 
-def test_info_is_published_retained_immediately_before_online(client) -> None:
+def test_info_and_identity_are_published_retained_before_online(client) -> None:
     client.broker_accepts_connection()
-    assert client.published == [(INFO_TOPIC, INFO, True), (HEALTH_TOPIC, "online", True)]
+    assert client.published == [
+        (INFO_TOPIC, INFO, True),
+        (DRIVER_TOPIC, '"tilt"', True),
+        (HEALTH_TOPIC, "online", True),
+    ]
 
 
-def test_info_is_published_again_on_every_reconnect(client) -> None:
+def test_info_and_identity_are_published_again_on_every_reconnect(client) -> None:
     client.broker_accepts_connection()
     client.broker_accepts_connection()
     assert client.published == [
         (INFO_TOPIC, INFO, True),
+        (DRIVER_TOPIC, '"tilt"', True),
         (HEALTH_TOPIC, "online", True),
         (INFO_TOPIC, INFO, True),
+        (DRIVER_TOPIC, '"tilt"', True),
         (HEALTH_TOPIC, "online", True),
     ]
 
@@ -80,10 +88,10 @@ def test_failed_connect_publishes_nothing(client) -> None:
     assert client.published == []
 
 
-def test_info_stays_retained_when_the_device_goes_offline(monkeypatch) -> None:
+def test_info_stays_retained_when_the_driver_goes_offline(monkeypatch) -> None:
     fake = FakeClient()
     monkeypatch.setattr(publisher_module.mqtt, "Client", lambda *a, **k: fake)
-    publisher = Publisher(MQTT, INFO)
+    publisher = Publisher(MQTT, INFO, IDENTITY)
     publisher.connect()
     fake.broker_accepts_connection()
     fake.published.clear()
