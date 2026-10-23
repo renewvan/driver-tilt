@@ -10,6 +10,10 @@ independent of the Python that computes it. Entity-level vocabulary
 The coordinate frame angles are reported in: +x forward, +y left, +z up. The board can be mounted in any orientation; `axis_x`/`axis_y`/`axis_z` in config map sensor axes onto it.
 _Avoid_: Sensor frame, board frame (the raw MPU axes, which are never published).
 
+**driver** (field):
+The retained `renewvan/tilt/<id>/driver` JSON string, always `"tilt"`: the key of the **Driver** (hub glossary: the software that publishes) that owns this tilt instance, equal to its `renewvan/tilt/info` segment. Republished on every MQTT (re)connect, before `online`.
+_Avoid_: Device (the physical GY-521/MPU-6050 board is hardware, not the Driver).
+
 **roll_deg**:
 Rotation about the van's forward axis, degrees, positive = left side down. `atan2(ay, az)` of the van-frame gravity vector, smoothed, minus the level-zero offset.
 _Avoid_: Bank, lean, tilt (the entity name; this is one of its two angles).

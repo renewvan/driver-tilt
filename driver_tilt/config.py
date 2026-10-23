@@ -34,8 +34,8 @@ class MqttConfig:
 
 
 @dataclass(frozen=True)
-class DeviceConfig:
-    id: str  # topic path segment, e.g. renewvan/tilt/<id>/...
+class DriverConfig:
+    id: str  # entity instance id: topic path segment, e.g. renewvan/tilt/<id>/...
     update_interval_ms: int
     i2c_bus: int
     i2c_address: int
@@ -64,7 +64,7 @@ class DeviceConfig:
 @dataclass(frozen=True)
 class AppConfig:
     mqtt: MqttConfig
-    device: DeviceConfig
+    driver: DriverConfig
 
 
 def load_config(
@@ -79,25 +79,25 @@ def load_config(
         logger.info("No local config override at %s; using defaults only", local_path)
 
     mqtt = parser["mqtt"]
-    device = parser["device"]
+    driver = parser["driver"]
 
-    device_config = DeviceConfig(
-        id=device.get("id", "tilt"),
-        update_interval_ms=device.getint("update_interval_ms", 500),
-        i2c_bus=device.getint("i2c_bus", 1),
-        i2c_address=int(device.get("i2c_address", "0x68"), 0),
-        axis_x=device.get("axis_x", "+x").strip(),
-        axis_y=device.get("axis_y", "+y").strip(),
-        axis_z=device.get("axis_z", "+z").strip(),
-        smoothing_alpha=device.getfloat("smoothing_alpha", 0.2),
-        gravity_min_g=device.getfloat("gravity_min_g", 0.8),
-        gravity_max_g=device.getfloat("gravity_max_g", 1.25),
-        publish_deadband_deg=device.getfloat("publish_deadband_deg", 0.1),
-        heartbeat_s=device.getfloat("heartbeat_s", 30.0),
-        error_threshold=device.getint("error_threshold", 3),
-        state_dir=Path(device.get("state_dir", str(DEFAULT_STATE_DIR))),
+    driver_config = DriverConfig(
+        id=driver.get("id", "tilt"),
+        update_interval_ms=driver.getint("update_interval_ms", 500),
+        i2c_bus=driver.getint("i2c_bus", 1),
+        i2c_address=int(driver.get("i2c_address", "0x68"), 0),
+        axis_x=driver.get("axis_x", "+x").strip(),
+        axis_y=driver.get("axis_y", "+y").strip(),
+        axis_z=driver.get("axis_z", "+z").strip(),
+        smoothing_alpha=driver.getfloat("smoothing_alpha", 0.2),
+        gravity_min_g=driver.getfloat("gravity_min_g", 0.8),
+        gravity_max_g=driver.getfloat("gravity_max_g", 1.25),
+        publish_deadband_deg=driver.getfloat("publish_deadband_deg", 0.1),
+        heartbeat_s=driver.getfloat("heartbeat_s", 30.0),
+        error_threshold=driver.getint("error_threshold", 3),
+        state_dir=Path(driver.get("state_dir", str(DEFAULT_STATE_DIR))),
     )
-    _validate(device_config)
+    _validate(driver_config)
 
     return AppConfig(
         mqtt=MqttConfig(
@@ -109,24 +109,24 @@ def load_config(
             reconnect_min_delay=mqtt.getfloat("reconnect_min_delay", 1.0),
             reconnect_max_delay=mqtt.getfloat("reconnect_max_delay", 30.0),
         ),
-        device=device_config,
+        driver=driver_config,
     )
 
 
-def _validate(device: DeviceConfig) -> None:
+def _validate(driver: DriverConfig) -> None:
     """Fail at startup on config that would otherwise misbehave at runtime."""
-    if not 0.0 < device.smoothing_alpha <= 1.0:
-        raise ValueError(f"smoothing_alpha must be in (0, 1]; got {device.smoothing_alpha}")
-    if not 0.0 < device.gravity_min_g < device.gravity_max_g:
+    if not 0.0 < driver.smoothing_alpha <= 1.0:
+        raise ValueError(f"smoothing_alpha must be in (0, 1]; got {driver.smoothing_alpha}")
+    if not 0.0 < driver.gravity_min_g < driver.gravity_max_g:
         raise ValueError(
             f"need 0 < gravity_min_g < gravity_max_g; got "
-            f"{device.gravity_min_g}..{device.gravity_max_g}"
+            f"{driver.gravity_min_g}..{driver.gravity_max_g}"
         )
-    if device.update_interval_ms <= 0:
-        raise ValueError(f"update_interval_ms must be > 0; got {device.update_interval_ms}")
-    if device.publish_deadband_deg < 0 or device.heartbeat_s <= 0:
+    if driver.update_interval_ms <= 0:
+        raise ValueError(f"update_interval_ms must be > 0; got {driver.update_interval_ms}")
+    if driver.publish_deadband_deg < 0 or driver.heartbeat_s <= 0:
         raise ValueError("publish_deadband_deg must be >= 0 and heartbeat_s > 0")
-    if device.error_threshold < 1:
-        raise ValueError(f"error_threshold must be >= 1; got {device.error_threshold}")
+    if driver.error_threshold < 1:
+        raise ValueError(f"error_threshold must be >= 1; got {driver.error_threshold}")
     # Raises ValueError with a precise message on a bad/degenerate mapping.
-    AxisMap(device.axis_x, device.axis_y, device.axis_z)
+    AxisMap(driver.axis_x, driver.axis_y, driver.axis_z)

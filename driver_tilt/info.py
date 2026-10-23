@@ -1,9 +1,9 @@
-"""Device info: the retained payload on renewvan/tilt/info.
+"""Driver info: the retained payload on renewvan/tilt/info.
 
-Copied (not shared) into every renewvan Python device, deliberately -- see
+Copied (not shared) into every renewvan Python Driver, deliberately -- see
 hub's ADR 0001. It loads the static manifest, then adds the two values that
 only exist at runtime: the version stamped from the git release tag
-(`DEVICE_VERSION`, `dev` when unset) and the board serial from /proc/cpuinfo.
+(`DRIVER_VERSION`, `dev` when unset) and the board serial from /proc/cpuinfo.
 """
 
 from __future__ import annotations
@@ -41,10 +41,10 @@ def build_info(
     cpuinfo_path: Path = CPUINFO_PATH,
     env: Mapping[str, str] = os.environ,
 ) -> str:
-    """Serialised Device info: manifest + stamped version + board serial (if any)."""
+    """Serialised Driver info: manifest + stamped version + board serial (if any)."""
     info = json.loads(manifest_path.read_text())
     info.pop("board_serial", None)  # runtime-only; never trust the file
-    info["version"] = env.get("DEVICE_VERSION") or "dev"
+    info["version"] = env.get("DRIVER_VERSION") or "dev"
     serial = board_serial(cpuinfo_path)
     if serial:
         info["board_serial"] = serial

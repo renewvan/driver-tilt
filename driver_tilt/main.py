@@ -12,7 +12,7 @@ from driver_tilt.driver import run
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="driver-tilt: MQTT Tilt device")
+    parser = argparse.ArgumentParser(description="driver-tilt: MQTT Tilt Driver")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "-c", "--config", default="config.ini", help="Path to local config.ini override"

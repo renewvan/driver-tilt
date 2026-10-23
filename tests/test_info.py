@@ -6,7 +6,7 @@ import pytest
 from driver_tilt.info import build_info
 
 MANIFEST = {
-    "device": "tilt",
+    "driver": "tilt",
     "product": "Tilt sensor",
     "source": "MPU-6050 IMU over I2C",
     "publishes": ["tilt"],
@@ -40,12 +40,12 @@ def test_payload_carries_manifest_fields_and_stamped_version(manifest_path, tmp_
     payload = info(
         manifest_path,
         cpuinfo(tmp_path, pi_cpuinfo(f"Serial\t\t: {REAL_SERIAL}")),
-        {"DEVICE_VERSION": "v0.4.2"},
+        {"DRIVER_VERSION": "v0.4.2"},
     )
     assert payload == {**MANIFEST, "version": "v0.4.2", "board_serial": REAL_SERIAL}
 
 
-@pytest.mark.parametrize("env", [{}, {"DEVICE_VERSION": ""}])
+@pytest.mark.parametrize("env", [{}, {"DRIVER_VERSION": ""}])
 def test_version_is_dev_when_unset_or_empty(manifest_path, tmp_path, env) -> None:
     payload = info(manifest_path, cpuinfo(tmp_path, pi_cpuinfo("")), env)
     assert payload["version"] == "dev"
@@ -71,7 +71,7 @@ def test_board_serial_is_omitted_when_absent_empty_or_all_zeros(
 def test_board_serial_is_omitted_when_cpuinfo_is_unreadable(manifest_path, tmp_path) -> None:
     payload = info(manifest_path, tmp_path / "does-not-exist", {})
     assert "board_serial" not in payload
-    assert payload["device"] == "tilt"
+    assert payload["driver"] == "tilt"
 
 
 def test_board_serial_survives_undecodable_bytes_elsewhere_in_cpuinfo(
@@ -86,6 +86,6 @@ def test_version_and_serial_in_manifest_file_are_not_trusted(tmp_path) -> None:
     # The schema forbids these in the file; the stamp is the only source.
     path = tmp_path / "manifest.json"
     path.write_text(json.dumps({**MANIFEST, "version": "v9.9.9", "board_serial": "fake"}))
-    payload = info(path, tmp_path / "missing", {"DEVICE_VERSION": "v1.0.0"})
+    payload = info(path, tmp_path / "missing", {"DRIVER_VERSION": "v1.0.0"})
     assert payload["version"] == "v1.0.0"
     assert "board_serial" not in payload

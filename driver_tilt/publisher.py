@@ -2,15 +2,15 @@
 
 Shared boilerplate across every renewvan/driver-* repo (see
 driver-tank/driver_tank/publisher.py): connect with retry/backoff, an LWT on a
-health topic so downstream consumers can detect a dead device, and a
-long-lived connection -- this device is the source of truth, not a
+health topic so downstream consumers can detect a dead Driver, and a
+long-lived connection -- this Driver is the source of truth, not a
 re-publisher.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from typing import Callable, Mapping
 
 import paho.mqtt.client as mqtt
 
@@ -23,9 +23,11 @@ INFO_TOPIC = "renewvan/tilt/info"
 
 
 class Publisher:
-    def __init__(self, config: MqttConfig, info_json: str) -> None:
+    def __init__(self, config: MqttConfig, info_json: str, identity: Mapping[str, str]) -> None:
         self._config = config
         self._info_json = info_json
+        # Retained entity identity fields (topic -> payload), republished on every connect.
+        self._identity = dict(identity)
         self._client = mqtt.Client(client_id=config.client_id, clean_session=False)
         if config.username:
             self._client.username_pw_set(config.username, config.password)
@@ -44,6 +46,9 @@ class Publisher:
             # Info first: a consumer that sees `online` must already have the info.
             # Retained, and never cleared -- "offline, last seen vX" depends on it.
             client.publish(INFO_TOPIC, payload=self._info_json, qos=1, retain=True)
+            # Entity identity before `online` too, so an online Driver is already attributed.
+            for topic, payload in self._identity.items():
+                client.publish(topic, payload=payload, qos=1, retain=True)
             client.publish(HEALTH_TOPIC, payload="online", qos=1, retain=True)
             for topic in self._subscriptions:
                 client.subscribe(topic, qos=1)

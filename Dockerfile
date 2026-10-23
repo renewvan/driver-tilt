@@ -10,9 +10,9 @@ COPY manifest.json driver_tilt/manifest.json
 COPY config.default.ini .
 
 # The git release tag, passed by release.yml; the only version source.
-# Unset (a local build) the device reports `dev`.
-ARG DEVICE_VERSION
-ENV DEVICE_VERSION=${DEVICE_VERSION}
+# Unset (a local build) the driver reports `dev`.
+ARG DRIVER_VERSION
+ENV DRIVER_VERSION=${DRIVER_VERSION}
 
 ENTRYPOINT ["python", "-m", "driver_tilt.main"]
 CMD ["--config", "/app/config.ini"]

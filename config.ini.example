@@ -7,7 +7,7 @@
 [mqtt]
 host = 192.168.1.10
 
-[device]
+[driver]
 ; Board mounted face-down, X toward the front of the van. Adjust to your
 ; mounting; see README "Mounting orientation".
 axis_x = +x
