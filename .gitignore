@@ -5,3 +5,6 @@
 /state/
 __pycache__/
 *.pyc
+
+# Local scratch notes; never committed
+.scratch/
