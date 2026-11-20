@@ -1,7 +1,7 @@
 # driver-tilt
 
 Native MQTT Driver for van inclination: reads a GY-521 (MPU-6050) accelerometer
-over I2C and publishes `roll_deg` / `pitch_deg` to the renewvan bus. Owns the
+over I2C and publishes `roll_deg` / `pitch_deg` to the Renewvan bus. Owns the
 sensing directly (no feed remap), same shape as `renewvan/driver-tank`: pure
 math (`tilt_math.py`), a layered `config.default.ini`/`config.ini` loader
 (`config.py`), a persistent MQTT publisher with LWT (`publisher.py`), a thin
@@ -75,7 +75,7 @@ last will), so consumers can show "offline, last seen vX".
   read once at start. It is omitted, never faked, when the file is
   unreadable or the serial is missing, empty or all zeros.
 
-`driver_tilt/info.py` is deliberately copied into each renewvan Python Driver
+`driver_tilt/info.py` is deliberately copied into each Renewvan Python Driver
 rather than shared as a package (see hub ADR 0001).
 
 Whether the van counts as "level" is a tolerance the dashboard applies; the
@@ -187,5 +187,5 @@ by tag (never builds from source — see
 
 A beta from a feature branch: dispatch the workflow on that branch with **prerelease**
 ticked. It runs the tests, publishes only its own tag (never `:latest`) and writes nothing
-to `main`. The process is shared by every renewvan repo and lives in `hub` (`hub/docs/adr/0015-one-release-process-via-reusable-workflows.md`);
+to `main`. The process is shared by every Renewvan repo and lives in `hub` (`hub/docs/adr/0015-one-release-process-via-reusable-workflows.md`);
 this repo's `release.yml` only says what it ships.
